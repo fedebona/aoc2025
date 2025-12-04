@@ -20,12 +20,12 @@ def P2(f):
     for line in f.readlines():
         if line[0] == 'R':
             increment = int(line[1:])
-            zeros += RoundsR(current, increment)
+            zeros += CountRoundsRight(current, increment)
             current = Add(current, increment)
         elif line[0] == 'L':
-            decrement = int(line[1:])
-            zeros += RoundsL(current, decrement)
-            current = Subtract(current, decrement)         
+            increment = int(line[1:])
+            zeros += CountRoundsLeft(current, increment)
+            current = Subtract(current, increment)         
     return zeros
 
 
@@ -35,10 +35,10 @@ def Add(current, increment):
 def Subtract(current, decrement):
     return (current - decrement + 100) % 100
 
-def RoundsR(current, increment):
+def CountRoundsRight(current, increment):
     return (current + increment) // 100
 
-def RoundsL(current, decrement):
+def CountRoundsLeft(current, decrement):
     newCurrent = Subtract(current, decrement)
     loops = decrement // 100
     if current == 0:
