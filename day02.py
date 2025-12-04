@@ -2,13 +2,16 @@
 def P1(ranges):
     validValues = []
     for r in ranges:
-        validValues.extend(ValidValues(r))
+        validValues.extend(ValidValuesP1(r))
 
     return sum(validValues)
 
 
 def P2(ranges):
-    return ""
+    validValues = []
+    for r in ranges:
+        validValues.extend(ValidValuesP2(r))
+    return sum(validValues)
 
 
 def ExtractLimits(m):
@@ -16,16 +19,16 @@ def ExtractLimits(m):
     return (int(parts[0]), int(parts[1])+1)
 
 
-def ValidValues(r):
+def ValidValuesP1(r):
     validValues = []
     for i in range(r[0], r[1]):
         strValue = str(i)
-        if (ValidValue(strValue)):
+        if (ValidValueP1(strValue)):
             validValues.append(i)
     return validValues
 
 
-def ValidValue(strValue):
+def ValidValueP1(strValue):
     if (len(strValue) % 2 != 0):
         return False
     h1 = strValue[:len(strValue)//2]
@@ -33,6 +36,35 @@ def ValidValue(strValue):
     if h1 == h2:
         return True
     return False
+
+
+def ValidValueP2(strValue):
+    if ValidValueP1(strValue):
+        return True
+    for i in range(0, len(strValue)//2):
+        if (len(strValue) % (i+1) != 0):
+            continue
+        h1 = strValue[:i+1]
+        h2 = strValue[i+1:]
+        if (Fit(h1, h2)):
+            return True
+    return False
+
+
+def Fit(h1, h2):
+    for i in range(0, len(h2), len(h1)):
+        if h1 != h2[i:i+len(h1)]:
+            return False
+    return True
+
+
+def ValidValuesP2(r):
+    validValues = []
+    for i in range(r[0], r[1]):
+        strValue = str(i)
+        if (ValidValueP2(strValue)):
+            validValues.append(i)
+    return validValues
 
 
 f = open("resources\day02.txt", "r")
