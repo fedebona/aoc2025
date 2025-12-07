@@ -1,4 +1,4 @@
-# advent of code 2024
+# advent of code 2025
 day_no = 1
 
 def P1(f):
