@@ -146,87 +146,111 @@ def IsBetween(point, p1, p2):
         return point.y == p1.y and min(p1.x, p2.x) <= point.x <= max(p1.x, p2.x)
     return False
 
-def IsRectangleContained(rectangle, points, max_point):  
-    if rectangle.max_x == rectangle.min_x:
+def IsPointInOrOnPolygon(point, polygon_points, sorted_polygon=None):
+    """
+    Check if a point is inside or on the boundary of a polygon.
+    """
+    if point in polygon_points:
         return True
-    direction =  rectangle.V1Directions()[0]
-    current_point = rectangle.calculatedv1
-    intersections = 0
-    if direction == MoveUp:
-        #for delta_y in range(rectangle.max_y - rectangle.min_y + 1):
-        while True:
-            current_point, moved = MoveUp(current_point, max_point)
-            if not moved:
-                break
-            segment_points = FindPointsByY(points, current_point.y)
-            if len(segment_points)>0 and IsBetween(current_point, segment_points[0], segment_points[-1]):
-                intersections += 1
-        if intersections != 1:
-            return False
-    current_point = rectangle.calculatedv1
-    intersections = 0
-    if direction == MoveDown:
-        #for delta_y in range(rectangle.max_y - rectangle.min_y + 1):
-        while True:
-            current_point, moved = MoveDown(current_point)
-            if not moved:
-                break
-            segment_points = FindPointsByY(points, current_point.y)
-            if len(segment_points)>0 and IsBetween(current_point, segment_points[0], segment_points[-1]):
-                intersections += 1
-        if intersections != 1:
-            return False
-    # current_point = rectangle.calculatedv1
     
-    # intersections = 0
-    # if direction == MoveLeft:
-    #     for delta_x in range(rectangle.max_x - rectangle.min_x + 1):
-    #         current_point, moved = MoveLeft(current_point)
-    #         if not moved:
-    #             break
-    #         segment_points = FindPointsByX(points, current_point.x)
-    #         if len(segment_points)>0 and IsBetween(current_point, segment_points[0], segment_points[-1]):
-    #             intersections += 1
-    #     if intersections != 1:
-    #         return False
-    # current_point = rectangle.calculatedv1
-    # intersections = 0   
-    # if direction == MoveRight:
-    #     for delta_x in range(rectangle.max_x - rectangle.min_x + 1):
-    #         current_point, moved = MoveRight(current_point, max_point)
-    #         if not moved:
-    #             break
-    #         segment_points = FindPointsByX(points, current_point.x)
-    #         if len(segment_points)>0 and IsBetween(current_point, segment_points[0], segment_points[-1]):
-    #             intersections += 1
-    #     if intersections != 1:
-    #         return False
+    if len(polygon_points) < 3:
+        return False
+    
+    # Use pre-sorted polygon if provided
+    if sorted_polygon is None:
+        # Calculate centroid and sort by angle
+        cx = sum(p.x for p in polygon_points) / len(polygon_points)
+        cy = sum(p.y for p in polygon_points) / len(polygon_points)
         
-    current_point = rectangle.calculatedv2
-    direction =  rectangle.V2Directions()[0]
+        import math
+        def angle_from_centroid(p):
+            return math.atan2(p.y - cy, p.x - cx)
+        
+        sorted_polygon = sorted(polygon_points, key=angle_from_centroid)
+    
+    n = len(sorted_polygon)
+    
+    # Check if point is on any polygon edge
+    for i in range(n):
+        p1 = sorted_polygon[i]
+        p2 = sorted_polygon[(i + 1) % n]
+        
+        # Check if point is on the line segment p1-p2
+        min_x, max_x = min(p1.x, p2.x), max(p1.x, p2.x)
+        min_y, max_y = min(p1.y, p2.y), max(p1.y, p2.y)
+        
+        if min_x <= point.x <= max_x and min_y <= point.y <= max_y:
+            # Check collinearity using cross product
+            cross = (point.y - p1.y) * (p2.x - p1.x) - (point.x - p1.x) * (p2.y - p1.y)
+            if abs(cross) < 1e-9:  # Point is on the line
+                return True
+    
+    # Ray casting for inside check
     intersections = 0
-    if direction == MoveUp:
-        for delta_y in range(rectangle.max_y - rectangle.min_y + 1):
-            current_point, moved = MoveUp(current_point, max_point)
-            if not moved:
-                break
-            segment_points = FindPointsByY(points, current_point.y)
-            if len(segment_points)>0 and IsBetween(current_point, segment_points[0], segment_points[-1]):
+    for i in range(n):
+        p1 = sorted_polygon[i]
+        p2 = sorted_polygon[(i + 1) % n]
+        
+        if (p1.y > point.y) != (p2.y > point.y):
+            x_intersection = (p2.x - p1.x) * (point.y - p1.y) / (p2.y - p1.y) + p1.x
+            if point.x < x_intersection:
                 intersections += 1
-        if intersections != 1:
+    
+    return intersections % 2 == 1
+
+def IsRectangleContained(rectangle, points, max_point):
+    """
+    Rectangle is valid if:
+    1. All corners are inside or on the polygon boundary
+    2. All rectangle edges stay inside the polygon (important for concave polygons)
+    
+    Optimized to pre-sort polygon once, then check every point on edges for accuracy.
+    """
+    # Pre-sort polygon once
+    cx = sum(p.x for p in points) / len(points)
+    cy = sum(p.y for p in points) / len(points)
+    
+    import math
+    def angle_from_centroid(p):
+        return math.atan2(p.y - cy, p.x - cx)
+    
+    sorted_polygon = sorted(points, key=angle_from_centroid)
+    
+    # Get the four corners
+    corners = [
+        Point(rectangle.min_x, rectangle.min_y),
+        Point(rectangle.min_x, rectangle.max_y),
+        Point(rectangle.max_x, rectangle.min_y),
+        Point(rectangle.max_x, rectangle.max_y)
+    ]
+    
+    # Check all corners are inside or on boundary
+    for corner in corners:
+        if not IsPointInOrOnPolygon(corner, points, sorted_polygon):
             return False
-    current_point = rectangle.calculatedv1
-    intersections = 0
-    if direction == MoveDown:
-        for delta_y in range(rectangle.max_y - rectangle.min_y + 1):
-            current_point, moved = MoveDown(current_point)
-            if not moved:
-                break
-            segment_points = FindPointsByY(points, current_point.y)
-            if len(segment_points)>0 and IsBetween(current_point, segment_points[0], segment_points[-1]):
-                intersections += 1
-        if intersections != 1:
+    
+    # Check every point along all four edges for accuracy
+    
+    # Top edge: from (min_x, max_y) to (max_x, max_y)
+    for x in range(rectangle.min_x, rectangle.max_x + 1):
+        if not IsPointInOrOnPolygon(Point(x, rectangle.max_y), points, sorted_polygon):
             return False
+    
+    # Bottom edge: from (min_x, min_y) to (max_x, min_y)
+    for x in range(rectangle.min_x, rectangle.max_x + 1):
+        if not IsPointInOrOnPolygon(Point(x, rectangle.min_y), points, sorted_polygon):
+            return False
+    
+    # Left edge: from (min_x, min_y) to (min_x, max_y)
+    for y in range(rectangle.min_y, rectangle.max_y + 1):
+        if not IsPointInOrOnPolygon(Point(rectangle.min_x, y), points, sorted_polygon):
+            return False
+    
+    # Right edge: from (max_x, min_y) to (max_x, max_y)
+    for y in range(rectangle.min_y, rectangle.max_y + 1):
+        if not IsPointInOrOnPolygon(Point(rectangle.max_x, y), points, sorted_polygon):
+            return False
+    
     return True
     
 
