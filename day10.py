@@ -1,18 +1,19 @@
 # advent of code 2025 - day 10
 import re
 from collections import deque
+import pulp
 day_no = 10
 
 
 class machine:
-    def __init__(self, lights, buttons, len_lights):
+    def __init__(self, lights, buttons, len_lights, joltage):
         self.lights = lights
         self.buttons = buttons
         self.len_lights = len_lights
-
+        self.joltage = joltage
     def __repr__(self):
         buttons_bin = [f"{b:0{self.len_lights}b}" for b in self.buttons]
-        return f"machine(lights={self.lights:0{self.len_lights}b}, buttons={buttons_bin})"
+        return f"machine(lights={self.lights:0{self.len_lights}b}, buttons={buttons_bin}, joltage={self.joltage}  )"
 
 
 def P1(machines):
@@ -57,8 +58,53 @@ def ValidateLights(machine):
 
 
 def P2(machines):
+    total_min_presses = 0
+    
+    for machine in machines:
+        min_presses = solve_joltage_puzzle(machine)
+        total_min_presses += min_presses
+    
+    return total_min_presses
 
-    return
+
+def solve_joltage_puzzle(machine):
+    """
+    Use Integer Linear Programming to find minimum button presses.
+    Each button increments specific elements by 1.
+    Find minimum total presses to reach exact target joltages.
+    """
+    num_elements = machine.len_lights
+    num_buttons = len(machine.buttons)
+    target = machine.joltage
+    
+    # Create the LP problem
+    prob = pulp.LpProblem("MinButtonPresses", pulp.LpMinimize)
+    
+    # Decision variables: number of times each button is pressed (non-negative integers)
+    button_presses = [pulp.LpVariable(f"button_{i}", lowBound=0, cat='Integer') 
+                      for i in range(num_buttons)]
+    
+    # Objective: minimize total button presses
+    prob += pulp.lpSum(button_presses)
+    
+    # Constraints: for each element, sum of increments must equal target
+    for element_idx in range(num_elements):
+        bit_position = num_elements - element_idx - 1
+        # Sum of button presses that affect this element
+        element_sum = pulp.lpSum([
+            button_presses[btn_idx] 
+            for btn_idx in range(num_buttons) 
+            if machine.buttons[btn_idx] & (1 << bit_position)
+        ])
+        prob += element_sum == target[element_idx], f"Element_{element_idx}"
+    
+    # Solve
+    prob.solve(pulp.PULP_CBC_CMD(msg=0))
+    
+    if prob.status == pulp.LpStatusOptimal:
+        return int(pulp.value(prob.objective))
+    else:
+        return 0
 
 def minSolutions(solutions):
     if not solutions:
@@ -80,19 +126,16 @@ def ReadMap(f):
         regexButtons = r"\((.*?)\)"
         matches2 = re.finditer(regexButtons, buttonsList, re.MULTILINE)
         for match2 in matches2:
-            # button = [False] * len(lights)
-            # for pos in match2.group(1).split(','):
-            #     buttonPos = int(pos)
-            #     button[buttonPos] = True
             button = 0
             for pos in match2.group(1).split(','):
                 button += (1 << (len_lights - int(pos) - 1))
             buttons.append(button)
-        machines.append(machine(lights, buttons, len_lights))
+        joltage = [int(x) for x in match.group(3).split(',') if x.strip().isdigit()]  
+        machines.append(machine(lights, buttons, len_lights, joltage))
     return machines
 
 
-with open(f"resources\day{day_no:02}.txt", "r", encoding="utf-8") as fh:
+with open(f"resources\\day{day_no:02}.txt", "r", encoding="utf-8") as fh:
     text = fh.read()
 machines = ReadMap(text)
 print(f"Day {day_no}/1: {P1(machines)}")
